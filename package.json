@@ -21,5 +21,11 @@
 	},
 	"devDependencies": {
 		"@types/node": "^12.0.4"
-	}
+	},
+	"files": [
+		"find-color.js",
+		"database",
+		"index.js",
+		"get-average-color.js"
+	]
 }
