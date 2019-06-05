@@ -8,11 +8,24 @@ make an e**moji** **mos**a**i**c of from your picture
 
 ## usage
 
-1. `npx mojimosi <imagepath> [tilesize]`
+1. `npx mojimosi [options] <image>`
 
-so like
+### options
 
-`npx mojimosi 12 frend.png > frend.txt`
+| option               | type   | description                                                             |
+| -------------------- | ------ | ----------------------------------------------------------------------- |
+| `--tilesize`, `-t`   | number | the number of pixels an emoji should represent                          |
+| `--background`, `-b` | string | a colour like "white" or "#ff2a50" to use in place of transparent tiles |
+
+### examples
+
+#### eat more pixels per emoji
+
+- `npx mojimosi -t64 friend.png > friend.txt`
+
+#### dark mode
+
+- `npx mojimosi -b black -t12 lol.png | pbcopy`
 
 ## thanks
 
@@ -30,10 +43,12 @@ TTC collection at `/System/Library/Fonts/Apple Color Emoji.ttc` using the
 posted about it on reddit and then everyone told them they were bad). then i
 extracted the emoji from the ttfs using the `extract-emoji` script here, that
 was by @InboxAppCo (or by @devangovett according to the package.json).
+
 then i created a plain text file that i've called [`database`](./database) to
 annoy rich hickey, which contains one-per-line of: `emoji red green blue alpha`,
 of the average colour of the image reported by the [`image-average-color`](https://npmjs.org/image-average-color)
 npm package.
+
 then, the picture that's given on the command line is sliced up into a grid the
 size of the [tilesize] provided on the command line (defaults to 32), then the
 average colour of each slice is matched as closely as it can be (by Mihai's

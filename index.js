@@ -34,6 +34,8 @@ let {argv} = require("yargs").command({
 				},
 				background: {
 					alias: ["b"],
+					description:
+						'a colour like "white" or "#ff2a50" to use in place of transparent tiles',
 					type: "string",
 					default: "white",
 					coerce: getColorFromName,
