@@ -1,6 +1,5 @@
 let fs = require("fs").promises
-let {promisify} = require("util")
-let getAverageColor = promisify(require("image-average-color"))
+let getAverageColor = require("./get-average-color")
 let resolvePath = require("path").resolve
 let {EOL} = require("os")
 
