@@ -1,14 +1,12 @@
 #!/usr/bin/env node
-let {promisify} = require("util")
 let {existsSync, createReadStream, promises: fs} = require("fs")
 let resolvePath = require("path").resolve
 let findColor = require("./find-color").find
-let readDataUri = require("data-uri-to-buffer")
 let {EOL} = require("os")
 let getImageSize = require("image-size")
 let Canvas = require("canvas")
-let Colorthief = require("color-thief")
 let colors = require("blee").all
+let getPalette = require("get-rgba-palette")
 
 let symbols = {
 	readFromStdin: Symbol("read from stdin"),
@@ -44,11 +42,12 @@ let {argv} = require("yargs").command({
 					coerce: getColorFromName,
 				},
 			})
+			.conflicts("width", "tilesize")
 			.positional("image", {
 				describe: "the image to turn into an emoji mosaic",
-				default: symbols.readFromStdin,
+				default: true,
 				coerce: path => {
-					if (path === symbols.readFromStdin || Object.is(path, true)) {
+					if (Object.is(path, true)) {
 						return symbols.readFromStdin
 					}
 					if (!existsSync(path)) {
@@ -69,9 +68,9 @@ function parseLine(line, lineno) {
 		throw new Error(`bad line: ${line} (${lineno + 1})`)
 	}
 
-	let [, emoji, red, green, blue, alpha] = match
-
 	// ignoring alpha here
+	let [, emoji, red, green, blue] = match
+
 	return {
 		emoji,
 		color: [red, green, blue],
@@ -85,18 +84,6 @@ async function readDatabase(databasePath) {
 }
 
 let databasePath = resolvePath(__dirname, "database")
-
-function createRange(from, to, step) {
-	let output = [from]
-	while (from + step < to) {
-		output.push((from = from + step))
-	}
-	return output
-}
-
-function createLines(n) {
-	return createRange(argv.tilesize, n, argv.tilesize)
-}
 
 async function getImage(imageData, size = getImageSize(imageData)) {
 	let canvas = Canvas.createCanvas(size.width, size.height)
@@ -116,16 +103,9 @@ async function getImage(imageData, size = getImageSize(imageData)) {
 	})
 }
 
-let colorthief = new Colorthief()
-
-function getDominantColor(buffer) {
-	return colorthief.getColor(buffer)
-}
-
 // read a stream into memory
 async function unstream(stream) {
 	let chunks = []
-	let push = chunk => chunks.push(chunk)
 	stream.on("data", chunk => chunks.push(chunk))
 	return new Promise((keep, brake) => {
 		stream.on("end", () => {
@@ -136,33 +116,35 @@ async function unstream(stream) {
 	})
 }
 
-function sliceImage({context, size: {width, height}, tilesize}) {
+function* sliceImage({context, size: {width, height}, tilesize}) {
 	let columns = width / tilesize
 	let rows = height / tilesize
-	let slices = []
-	for (let y = 0; y < rows; ++y) {
-		for (let x = 0; x < columns; ++x) {
-			let sliceCanvas = Canvas.createCanvas(tilesize, tilesize)
-			let sliceContext = sliceCanvas.getContext("2d")
-			let point = [x * tilesize, y * tilesize]
-			sliceContext.drawImage(
-				context.canvas,
-				...point,
-				tilesize,
-				tilesize,
-				0,
-				0,
-				width,
-				height
-			)
-			slices.push({
-				x: point[0],
-				y: point[1],
-				url: sliceCanvas.toDataURL(),
-			})
+	for (let rowStep = 0; rowStep < rows; rowStep++) {
+		for (let columnStep = 0; columnStep < columns; columnStep++) {
+			let x = tilesize * columnStep
+			let y = tilesize * rowStep
+			let pixels
+			try {
+				pixels = context.getImageData(x, y, tilesize, tilesize).data
+			} catch (error) {
+				throw new Error("width provided was bigger than the image")
+			}
+			let [color] = getPalette(pixels, 1, 1 + tilesize / 2)
+			yield {
+				x,
+				y,
+				color,
+			}
 		}
 	}
-	return slices
+}
+
+function getTilesize({imageWidth, argv}) {
+	return argv.tilesize
+		? argv.tilesize
+		: argv.width
+		? imageWidth / argv.width
+		: 32
 }
 
 (async function beepBoopBork() {
@@ -174,13 +156,11 @@ function sliceImage({context, size: {width, height}, tilesize}) {
 			: createReadStream(argv.image)
 	let imageData = await unstream(imageStream)
 	let {context, size} = await getImage(imageData)
-	let {width, height} = size
-	let lines = [createLines(height), createLines(width)]
 
 	let slices = sliceImage({
 		context,
 		size,
-		tilesize: argv.tilesize,
+		tilesize: getTilesize({imageWidth: size.width, argv}),
 	})
 
 	// all in one big loop !!
@@ -189,13 +169,12 @@ function sliceImage({context, size: {width, height}, tilesize}) {
 		if (previousSlice && slice.y > previousSlice.y) {
 			print(EOL)
 		}
-		let buffer = readDataUri(slice.url)
-		let dominantColor = await getDominantColor(buffer)
-		let color = dominantColor || argv.background
+		let color = slice.color || argv.background
 		let closest = findColor(color, emojiColors)
 		let match = database.find(line => closest === line.color)
 		let emoji = match && match.emoji
-		print(emoji + " ")
+		print(emoji)
+		print(" ")
 		previousSlice = slice
 	}
 	print(EOL)
