@@ -1,13 +1,14 @@
 #!/usr/bin/env node
 let {promisify} = require("util")
 let {existsSync, promises: fs} = require("fs")
-let getPixels = promisify(require("get-pixels"))
 let resolvePath = require("path").resolve
 let findColor = require("./find-color").find
 let readDataUri = require("data-uri-to-buffer")
 let createSlices = promisify(require("image-to-slices"))
-let getAverageColor = require("./get-average-color")
 let {EOL} = require("os")
+let getImageSize = require("image-size")
+let Canvas = require("canvas")
+let Colorthief = require("color-thief")
 
 createSlices.configure({
 	clipperOptions: {
@@ -41,7 +42,7 @@ async function readDatabase(databasePath) {
 
 let databasePath = resolvePath(__dirname, "database")
 
-let imagepath = process.argv[2]
+let imagepath = resolvePath(process.cwd(), process.argv[2])
 if (!imagepath) {
 	console.error("usage: mojimosi <imagepath> [tilesize]")
 	process.exit(22)
@@ -61,10 +62,34 @@ function createLines(n) {
 	return createRange(emojiHeight, n, emojiHeight)
 }
 
+async function getImageContext(imageData, size = getImageSize(imageData)) {
+	let canvas = Canvas.createCanvas(size.width, size.height)
+	let context = canvas.getContext("2d")
+	let imageElement = new Canvas.Image()
+	return new Promise((resolve, reject) => {
+		imageElement.onload = () => {
+			context.drawImage(imageElement, 0, 0)
+			resolve(context)
+		}
+		imageElement.onerror = reject
+		imageElement.src = imageData
+	})
+}
+
+let colorthief = new Colorthief()
+
+function getAverageColor(buffer) {
+	return colorthief.getColor(buffer)
+}
+
+let background = [255, 255, 255]
+
 ;(async function beepBoopBork() {
 	let database = await readDatabase(databasePath)
 	let colors = database.map(line => line.color)
-	let [width, height] = (await getPixels(imagepath)).shape
+	let imageData = await fs.readFile(imagepath)
+	let context = await getImageContext(imageData)
+	let {width, height} = getImageSize(imageData)
 	let lines = [createLines(height), createLines(width)]
 
 	// this always throws? ^_^ what
@@ -78,9 +103,9 @@ function createLines(n) {
 		if (previousSlice && slice.y > previousSlice.y) {
 			print(EOL)
 		}
-		let color = await getAverageColor(readDataUri(slice.dataURI))
-		let rgb = color.slice(0, 3)
-		let closest = findColor(rgb, colors)
+		let color =
+			(await getAverageColor(readDataUri(slice.dataURI))) || background
+		let closest = findColor(color, colors)
 		let match = database.find(line => {
 			return closest === line.color
 		})
@@ -89,4 +114,4 @@ function createLines(n) {
 		previousSlice = slice
 	}
 	print(EOL)
-})()
+})().catch(console.error)
