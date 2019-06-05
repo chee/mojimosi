@@ -13,9 +13,8 @@
 	"dependencies": {
 		"blee": "^1.0.1",
 		"canvas": "^2.5.0",
-		"color-thief": "^2.2.5",
-		"data-uri-to-buffer": "^2.0.1",
 		"find-color": "^0.1.0",
+		"get-rgba-palette": "^2.0.1",
 		"image-average-color": "^1.0.0",
 		"image-size": "^0.7.4",
 		"imagemagick": "^0.1.3",
