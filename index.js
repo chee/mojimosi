@@ -31,7 +31,11 @@ let {argv} = require("yargs").command({
 					alias: ["t"],
 					description: "the number of pixels an emoji should represent",
 					type: "number",
-					default: 32,
+				},
+				width: {
+					alias: ["w"],
+					description: "the number of emoji to print per line",
+					type: "number",
 				},
 				background: {
 					alias: ["b"],
