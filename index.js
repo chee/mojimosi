@@ -9,6 +9,42 @@ let {EOL} = require("os")
 let getImageSize = require("image-size")
 let Canvas = require("canvas")
 let Colorthief = require("color-thief")
+let colors = require("blee").all
+
+function getColorFromName(name) {
+	let color = colors.get(name)
+	if (!color) {
+		throw `couldn't turn ${name} into a color :(`
+	}
+	let {r, g, b} = color
+	return [r, g, b]
+}
+
+let {argv} = require("yargs").command({
+	command: "$0 <image>",
+	describe: "make an emoji mosaic from an image",
+	builder: yargs => {
+		yargs
+			.options({
+				tilesize: {
+					alias: ["t"],
+					description: "the number of pixels an emoji should represent",
+					type: "number",
+					default: 32,
+				},
+				background: {
+					alias: ["b"],
+					type: "string",
+					default: "white",
+					coerce: getColorFromName,
+				},
+			})
+			.positional("image", {
+				describe: "the image to turn into an emoji mosaic",
+				validate: existsSync,
+			})
+	},
+})
 
 createSlices.configure({
 	clipperOptions: {
@@ -42,12 +78,6 @@ async function readDatabase(databasePath) {
 
 let databasePath = resolvePath(__dirname, "database")
 
-let imagepath = resolvePath(process.cwd(), process.argv[2])
-if (!imagepath) {
-	console.error("usage: mojimosi <imagepath> [tilesize]")
-	process.exit(22)
-}
-
 function createRange(from, to, step) {
 	let output = [from]
 	while (from + step < to) {
@@ -56,10 +86,8 @@ function createRange(from, to, step) {
 	return output
 }
 
-let emojiHeight = Number(process.argv[3]) || 32
-
 function createLines(n) {
-	return createRange(emojiHeight, n, emojiHeight)
+	return createRange(argv.tilesize, n, argv.tilesize)
 }
 
 async function getImageContext(imageData, size = getImageSize(imageData)) {
@@ -78,22 +106,20 @@ async function getImageContext(imageData, size = getImageSize(imageData)) {
 
 let colorthief = new Colorthief()
 
-function getAverageColor(buffer) {
+function getDominantColor(buffer) {
 	return colorthief.getColor(buffer)
 }
 
-let background = [255, 255, 255]
-
 ;(async function beepBoopBork() {
 	let database = await readDatabase(databasePath)
-	let colors = database.map(line => line.color)
-	let imageData = await fs.readFile(imagepath)
+	let emojiColors = database.map(line => line.color)
+	let imageData = await fs.readFile(argv.image)
 	let context = await getImageContext(imageData)
 	let {width, height} = getImageSize(imageData)
 	let lines = [createLines(height), createLines(width)]
 
 	// this always throws? ^_^ what
-	let slices = await createSlices(imagepath, ...lines, {
+	let slices = await createSlices(argv.image, ...lines, {
 		saveToDataUrl: true,
 	}).catch(what => what)
 
@@ -103,12 +129,11 @@ let background = [255, 255, 255]
 		if (previousSlice && slice.y > previousSlice.y) {
 			print(EOL)
 		}
-		let color =
-			(await getAverageColor(readDataUri(slice.dataURI))) || background
-		let closest = findColor(color, colors)
-		let match = database.find(line => {
-			return closest === line.color
-		})
+		let buffer = readDataUri(slice.dataURI)
+		let dominantColor = await getDominantColor(buffer)
+		let color = dominantColor || argv.background
+		let closest = findColor(color, emojiColors)
+		let match = database.find(line => closest === line.color)
 		let emoji = match && match.emoji
 		print(emoji + " ")
 		previousSlice = slice
