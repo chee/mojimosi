@@ -178,4 +178,8 @@ function getTilesize({imageWidth, argv}) {
 		previousSlice = slice
 	}
 	print(EOL)
-})().catch(console.error)
+})().catch(error => {
+	let message = error ? error.toString() : "something threw nothing"
+	process.stderr.write(message + EOL)
+	process.exit(1)
+})
