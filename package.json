@@ -18,7 +18,6 @@
 		"find-color": "^0.1.0",
 		"image-average-color": "^1.0.0",
 		"image-size": "^0.7.4",
-		"image-to-slices": "^0.1.3",
 		"imagemagick": "^0.1.3",
 		"minimist": "^1.2.0",
 		"yargs": "^13.2.4"
