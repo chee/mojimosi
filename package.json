@@ -8,7 +8,7 @@
 	},
 	"bin": "index.js",
 	"keywords": [],
-	"author": "chee <chee@snoot.club>",
+	"author": "chee <yay@chee.party>",
 	"license": "GPL-3.0+",
 	"dependencies": {
 		"blee": "^1.0.1",
